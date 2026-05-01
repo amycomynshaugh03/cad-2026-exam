@@ -1,1 +1,1 @@
-{"team1Id": 2, "team2Id": 3, "details": {"type": "Score", "time": 32, "description": "Player X scores for team 2"}}
+{"id": "20", "name": "Team 20", "players": ["Player 1", "Player 2", "Player 3", "Player 4", "Player 5"]}

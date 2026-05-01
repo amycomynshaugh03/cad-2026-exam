@@ -107,8 +107,14 @@ export class ExamStack extends cdk.Stack {
 
 
     topic.addSubscription(
-      new subs.LambdaSubscription(lambdaC)
-    );
+    new subs.LambdaSubscription(lambdaC, {
+    filterPolicy: {
+      age_grade: sns.SubscriptionFilter.stringFilter({
+        denylist: ["U14", "U17", "U20"],
+       }),
+      },
+    })
+  );
 
     lambdaA.addEventSource(
       new events.SqsEventSource(queue, {
