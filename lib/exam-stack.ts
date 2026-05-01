@@ -31,7 +31,7 @@ export class ExamStack extends cdk.Stack {
             [tournament.tableName]: generateSeedData(),
           },
         },
-        physicalResourceId: custom.PhysicalResourceId.of("itemsddbInitData"), //.of(Date.now().toString()),
+        physicalResourceId: custom.PhysicalResourceId.of("itemsddbInitData"),
       },
       policy: custom.AwsCustomResourcePolicy.fromSdkCalls({
         resources: [tournament.tableArn],
@@ -40,8 +40,17 @@ export class ExamStack extends cdk.Stack {
 
     // Integration infrastructure
 
+    const dlq = new sqs.Queue(this, "InvalidTeamDLQ", {
+      receiveMessageWaitTime: cdk.Duration.seconds(5),
+    });
+
+  
     const queue = new sqs.Queue(this, "TournamentQ", {
       receiveMessageWaitTime: cdk.Duration.seconds(5),
+      deadLetterQueue: {
+        queue: dlq,
+        maxReceiveCount: 1,
+      },
     });
 
     const topic = new sns.Topic(this, "TournamentTopic", {
@@ -71,12 +80,14 @@ export class ExamStack extends cdk.Stack {
       },
     });
 
+
     const lambdaC = new lambdanode.NodejsFunction(this, "lambdaC", {
       runtime: lambda.Runtime.NODEJS_22_X,
       entry: `${__dirname}/../lambdas/lambdaC.ts`,
       timeout: cdk.Duration.seconds(15),
       memorySize: 128,
       environment: {
+        TABLE_NAME: tournament.tableName,
         REGION: "eu-west-1",
       },
     });
@@ -84,15 +95,20 @@ export class ExamStack extends cdk.Stack {
     // Subscriptions
 
     topic.addSubscription(
-    new subs.SqsSubscription(queue, {
-    rawMessageDelivery: true,
-    filterPolicy: {
-      age_grade: sns.SubscriptionFilter.stringFilter({
-        allowlist: ["U14", "U17", "U20"],
-        }),
-      },
-    })
-  );
+      new subs.SqsSubscription(queue, {
+        rawMessageDelivery: true,
+        filterPolicy: {
+          age_grade: sns.SubscriptionFilter.stringFilter({
+            allowlist: ["U14", "U17", "U20"],
+          }),
+        },
+      })
+    );
+
+
+    topic.addSubscription(
+      new subs.LambdaSubscription(lambdaC)
+    );
 
     lambdaA.addEventSource(
       new events.SqsEventSource(queue, {
@@ -101,10 +117,19 @@ export class ExamStack extends cdk.Stack {
       })
     );
 
+    
+    lambdaB.addEventSource(
+      new events.SqsEventSource(dlq, {
+        batchSize: 5,
+        maxBatchingWindow: cdk.Duration.seconds(5),
+      })
+    );
+
     // Permissions
 
     tournament.grantReadWriteData(lambdaA);
-    
+    tournament.grantReadWriteData(lambdaC); 
+
     // Output
 
     new cdk.CfnOutput(this, "SNS Topic ARN", {

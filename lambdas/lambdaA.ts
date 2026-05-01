@@ -2,7 +2,7 @@
 import { SQSHandler } from "aws-lambda";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
-import { DBTeam , Team } from "../shared/types";
+import { DBTeam, Team } from "../shared/types";
 
 const ddbDocClient = createDDbDocClient();
 
@@ -11,19 +11,21 @@ export const handler: SQSHandler = async (event) => {
 
   for (const record of event.Records) {
     const team = JSON.parse(record.body) as Team;
-    const dbTeam: DBTeam = { 
-      pk: `m#${team.id}`, 
-      sk: `m#${team.id}`, 
+
+    const ageGrade = record.messageAttributes?.age_grade?.stringValue;
+
+    const dbTeam: DBTeam = {
+      pk: `m#${team.id}`,
+      sk: `m#${team.id}`,
       name: team.name,
-      ageGrade: 'U17',
-      players: team.players 
-    }
+      ageGrade: ageGrade || "U14",
+      players: team.players,
+    };
+
     await ddbDocClient.send(
       new PutCommand({
         TableName: process.env.TABLE_NAME,
-        Item: {
-          ...dbTeam,
-        },
+        Item: { ...dbTeam },
       })
     );
   }
