@@ -84,10 +84,15 @@ export class ExamStack extends cdk.Stack {
     // Subscriptions
 
     topic.addSubscription(
-      new subs.SqsSubscription(queue, {
-        rawMessageDelivery: true,
-      })
-    );
+    new subs.SqsSubscription(queue, {
+    rawMessageDelivery: true,
+    filterPolicy: {
+      age_grade: sns.SubscriptionFilter.stringFilter({
+        allowlist: ["U14", "U17", "U20"],
+        }),
+      },
+    })
+  );
 
     lambdaA.addEventSource(
       new events.SqsEventSource(queue, {
